@@ -1,0 +1,168 @@
+#!/bin/bash
+
+#A script to automate the installation of Wordpress.
+#
+#Author : Brodie Deans 
+#Date : 23/11/2020
+#Version : 1.0
+
+#check that the script is being run by the root user
+if [ $(id -u) != "0" ]; then
+    echo "You must be the superuser to run this script" >&2
+    exit 1
+fi
+
+#enter your code here
+echo "Welcome to the wordpress installation"
+sleep 5
+
+#capture errors and output to a logfile in the same directory that the script i>
+exec > >(tee "error.log") 2>&1
+
+
+#the following variable is set to rename the web directory and enter the mysql >
+#for the database plus the password for the mysql database root user
+
+# get wordpress directory (my surname)
+read -p "Please enter your surname: " SURNAME
+# get database name
+read -p "Please enter database name: " DBNAME
+# get database user
+read -p "Please enter username for database: " DBUSER
+# get database password
+read -p "Please enter your database password: " DBPASSWORD
+
+echo $SURNAME $DBNAME $DBUSER $DBPASSWORD
+
+#display the banner and continue the install
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+asd(){
+cat <<"EOT"
+                       _
+__      _____  _ __ __| |_ __  _ __ ___  ___ ___ 
+\ \ /\ / / _ \| '__/ _` | '_ \| '__/ _ \/ __/ __|
+ \ V  V / (_) | | | (_| | |_) | | |  __/\__ \__ \
+  \_/\_/ \___/|_|  \__,_| .__/|_|  \___||___/___/
+                        |_|
+EOT
+}
+asd
+echo "Student id: 13209232"
+echo "                      is now downloading and installing"
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+
+#change into the web root directory
+echo "changing directories ........."
+cd /var/www
+sleep 1
+
+#create a directory named with the  domain_name variable you entered at the start of the scrip>
+echo "Creating new Directory...."
+mkdir $SURNAME
+sleep 1
+
+#download the latest version of wordpress
+echo "downloading wordpress ... "
+cd /tmp
+curl -O https://wordpress.org/latest.tar.gz
+sleep 1
+
+#unzip wordpress. it will unzip into a directory called wordpress
+echo "unzipping wordpress and placing into wordpress directory..."
+tar xzvf latest.tar.gz
+sleep 1  
+
+# change into the wordpress directory
+echo "changing into wordpress directory and creating upgrade and uploads directories...."
+cd /tmp/wordpress
+
+touch /tmp/wordpress/.htaccess
+
+mkdir /tmp/wordpress/wp-content/upgrade
+mkdir /tmp/wordpress/wp-content/uploads
+sleep 1
+
+#copy the contents of the wordpress directory to your domain_name directory.
+echo "Copying contents of WP directory to $SURNAME directory...."
+cp -a /tmp/wordpress/. /var/www/$SURNAME
+sleep 1
+
+#change back to the web root directory
+echo "Changing back to root directory..."
+cd /var/www/
+sleep 1
+
+#delete the wordpress directory
+echo "Deleting WP directory...."
+rm -f /tmp/latest.tar.gz
+rm -rf /tmp/wordpress
+
+sleep 1
+
+#change into the directory that now contains the wordpress files ie the $domain_name directory
+cd $SURNAME
+sleep 1
+
+#create a wp-config.php file from the wp-config-sample.php file
+cp wp-config-sample.php wp-config.php
+sleep 1
+
+#use sed to change the wp-config.php file adding the database name the user and the password.
+echo "modifying wp-config.php file..."
+
+sed -i "s/database_name_here/$DBNAME/" wp-config.php
+sed -i "s/username_here/$DBUSER/" wp-config.php
+sed -i "s/password_here/$DBPASSWORD/" wp-config.php
+sleep 1
+
+
+#grant permissions
+echo "Granting permissions..."
+chown -R www-data:www-data /var/www/$SURNAME
+
+find /var/www/$SURNAME/ -type d -exec chmod 750 {} \;
+find /var/www/$SURNAME/ -type f -exec chmod 640 {} \;
+sleep 1
+
+#create a virtual host for you domain.
+echo "Creating hosts.."
+cd /etc/apache2/sites-available/
+cp 000-default.conf $SURNAME.conf
+
+#add the virtual host mapping to you hosts file.
+#This is only necessary for the purpose of this lab
+sed -i "s/#ServerName www.example.com/ServerName $SURNAME.local/" $SURNAME.conf
+sed -i "s/webmaster@localhost/webmaster@$SURNAME.local/" $SURNAME.conf
+sed -i "s/html/$SURNAME/" $SURNAME.conf
+sed -i "s/error.log/$SURNAME-error.log/" $SURNAME.conf
+sed -i "s/access.log/$SURNAME-access.log/" $SURNAME.conf
+
+#enable the virtual host
+echo "Enabling virtual host..."
+a2ensite $SURNAME
+sleep 1
+
+#restart apache2
+echo "Restarting Apache2.."
+systemctl reload apache2
+systemctl restart apache2
+sleep 1
+
+#adding entry to host file
+echo "127.0.0.1          $SURNAME.local" >> /etc/hosts
+
+
+#cleaning up - removing install files and the wp-config-sample.php file
+echo "Cleaning up installation files..."
+rm -rf /var/www/$SURNAME/wp-config-sample.php
+sleep 1
+
+echo "Wordpress is now installed"
+exit 0
+
+
+
+
+
+
+
